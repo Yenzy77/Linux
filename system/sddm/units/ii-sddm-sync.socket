@@ -1,0 +1,13 @@
+[Unit]
+Description=Local wallpaper and palette updates for the SDDM greeter
+
+[Socket]
+ListenStream=/run/ii-sddm-sync.sock
+SocketUser=@PUBLISHER_USER@
+SocketMode=0600
+Accept=yes
+MaxConnections=1
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

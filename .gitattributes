@@ -1,0 +1,2 @@
+# Preserve significant unified-diff context spacing.
+*.patch -whitespace

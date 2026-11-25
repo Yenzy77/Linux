@@ -1,0 +1,37 @@
+# Local state and host overrides
+*.local
+*.local.*
+.env
+.env.*
+!.env.example
+.local/
+local/
+backups/
+*.bak
+*.log
+*.swp
+__pycache__/
+*.py[cod]
+.cache/
+.venv/
+*.qoi
+*.vmdk
+*.qcow2
+*.fd
+*.img
+*.efi
+*.key
+*.pem
+*.p12
+*.kdbx
+*.keyring
+*.kwl
+*.db
+*.sqlite*
+Cookies*
+Login\ Data*
+.ssh/
+.gnupg/
+.aws/
+.codex/
+.config/

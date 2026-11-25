@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Check the proposed public tree without displaying suspected values."""
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+
+ROOT = Path(__file__).resolve().parent.parent
+RULES = {
+    "private key": rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----",
+    "credential token": rb"\b(?:gh[pousr]_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{25,}|(?:AKIA|ASIA)[A-Z0-9]{16}|sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[a-zA-Z0-9-]{15,}|AIza[A-Za-z0-9_-]{30,})\b",
+    "credential assignment": rb"""(?im)^\s*(?:export\s+)?[\w.-]*(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*["'][^$\{<"'\n][^"'\n]{7,}["']""",
+    "credential in URL": rb"https?://[^/\s:@]+:[^/\s@]+@",
+    "disk identifier": rb"(?i)(?:UUID|PARTUUID|root=UUID)=[0-9a-f][0-9a-f-]{7,}",
+    "embedded private key data": rb"\b(?:ssh-ed25519|ssh-rsa)\s+AAAA[A-Za-z0-9+/=]{30,}",
+}
+PRIVATE_PATH = re.compile(
+    r"(?i)(^|/)(?:\.git|\.config|\.aws|\.ssh|\.gnupg|\.codex|\.env[^/]*|keyrings|backups|BraveSoftware)(?:/|$)"
+    r"|\.(?:pem|key|keyring|kwl|sqlite3?|db|efi|qoi|png|jpe?g|webp|qcow2|img|zip|tar|gz|ttf|otf|pyc|log)$"
+)
+findings = []
+
+
+def git(*args):
+    return subprocess.check_output(["git", "-C", ROOT, *args])
+
+
+def private_values():
+    home = str(Path.home()).encode()
+    found = [home + b"/"]
+    for file in (Path("/etc/machine-id"),):
+        if file.is_file():
+            value = file.read_bytes().strip()
+            if len(value) > 15:
+                found.append(value)
+    try:
+        email = git("config", "--global", "--get", "user.email").strip()
+        if b"@" in email and b"@users.noreply.github.com" not in email:
+            found.append(email)
+    except subprocess.CalledProcessError:
+        pass
+    return found
+
+
+def scan(label, data, private):
+    if b"\0" in data:
+        findings.append((label, "binary content"))
+    for rule, pattern in RULES.items():
+        if re.search(pattern, data):
+            findings.append((label, rule))
+    if any(value in data for value in private):
+        findings.append((label, "host identity, private path or private author email"))
+
+
+def main():
+    private = private_values()
+    manifest = "scripts/public-files.txt"
+    worktree = "--worktree" in sys.argv
+    records = git("ls-files", "--stage", "-z").split(b"\0")[:-1]
+    blobs = {}
+    for record in records:
+        info, _, raw = record.partition(b"\t")
+        mode, oid, stage = info.decode().split()
+        path = raw.decode()
+        if mode not in ("100644", "100755") or stage != "0" or PRIVATE_PATH.search(path):
+            findings.append((path, "unapproved path or index type"))
+        blobs[path] = oid
+    if worktree:
+        expected = (ROOT / manifest).read_text().splitlines()
+        visible = git("ls-files", "--cached", "--others", "--exclude-standard", "-z")
+        blobs = dict.fromkeys(os.fsdecode(item) for item in visible.split(b"\0") if item)
+    elif manifest not in blobs:
+        findings.append((manifest, "missing staged allowlist"))
+        expected = []
+    else:
+        expected = git("cat-file", "blob", blobs[manifest]).decode().splitlines()
+    if expected != sorted(blobs):
+        for path in sorted(set(expected).symmetric_difference(blobs)):
+            findings.append((path, "staged path differs from allowlist"))
+        if sorted(expected) != expected or len(set(expected)) != len(expected):
+            findings.append((manifest, "allowlist must be sorted and unique"))
+    for path, oid in blobs.items():
+        file = ROOT / path
+        if PRIVATE_PATH.search(path) or (worktree and (file.is_symlink() or not file.is_file())):
+            findings.append((path, "unapproved path or file type"))
+            continue
+        data = file.read_bytes() if worktree else git("cat-file", "blob", oid)
+        if len(data) > 262144:
+            findings.append((path, "file exceeds text capture size limit"))
+        scan(path, data, private)
+        if path.endswith(".md"):
+            text = data.decode("utf-8")
+            for link in re.findall(r"\]\(([^)\s]+)\)", text):
+                if ":" in link or link.startswith("#"):
+                    continue
+                target = link.partition("#")[0]
+                resolved = os.path.normpath(str(PurePosixPath(path).parent / target))
+                if resolved not in blobs and not any(p.startswith(resolved + "/") for p in blobs):
+                    findings.append((path, "unresolved local Markdown link"))
+    if "--objects" in sys.argv:
+        bases = [arg.partition("=")[2] for arg in sys.argv if arg.startswith("--base=")]
+        inherited = set(git("rev-list", *bases, "--").decode().splitlines()) if bases else set()
+        objects = git("cat-file", "--batch-all-objects", "--batch-check=%(objecttype) %(objectname)").decode()
+        allowed_blobs = set(blobs.values())
+        for line in objects.splitlines():
+            kind, oid = line.split()
+            if kind == "blob" and oid in allowed_blobs:
+                continue
+            if kind == "blob":
+                # Restaging can leave loose versions in the local object
+                # store. Scan their content too, even though Git won't push them.
+                data = git("cat-file", "blob", oid)
+                if len(data) > 262144:
+                    findings.append((oid[:10], "oversize unstaged Git blob"))
+                scan(f"unstaged blob {oid[:10]}", data, private)
+            elif kind == "commit":
+                data = git("cat-file", "commit", oid)
+                # Existing public history is retained. Inspect its message
+                # without imposing this repository's policy retroactively.
+                content = data.partition(b"\n\n")[2] if oid in inherited else data
+                scan(f"commit {oid[:10]}", content, private)
+                identities = re.findall(rb"(?m)^(?:author|committer) [^\n]*<([^>]+)> ", data)
+                if oid not in inherited and (len(identities) != 2 or any(not item.endswith(b"@users.noreply.github.com") for item in identities)):
+                    findings.append((oid[:10], "private or unexpected commit identity"))
+                if oid not in inherited and re.search(rb"(?im)^Co-authored-by:", data):
+                    findings.append((oid[:10], "unexpected contributor trailer"))
+            elif kind != "tree":
+                findings.append((oid[:10], "Git object outside the approved baseline"))
+    for label, rule in findings:
+        print(f"FAIL {label}: {rule}", file=sys.stderr)
+    if not findings:
+        scope = "working-tree" if worktree else "staged"
+        print(f"Publication checks passed for {len(blobs)} {scope} text files.")
+    return bool(findings)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

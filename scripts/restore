@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -eu
+if (($# == 0)); then
+    printf 'Usage: %s PRIVATE_BACKUP [overlay options]\n' "$0" >&2
+    exit 2
+fi
+project=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+backup=$1
+shift
+exec "$project/scripts/install" --restore "$backup" "$@"

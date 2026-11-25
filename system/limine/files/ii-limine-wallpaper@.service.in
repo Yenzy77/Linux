@@ -1,0 +1,29 @@
+[Unit]
+Description=Validate and publish the ii wallpaper and menu colors to Limine
+ConditionPathIsMountPoint=@ESP@
+
+[Service]
+Type=exec
+User=root
+Group=root
+ExecStart=/usr/bin/python -IS /usr/local/lib/ii-limine-wallpaper/publish.py
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+UMask=0077
+RuntimeMaxSec=35s
+MemoryMax=96M
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths=@ESP@
+ReadOnlyPaths=-@ESP@/EFI -@ESP@/@MACHINE_ID@ -@ESP@/loader -@ESP@/limine.conf.old -@ESP@/intel-ucode.img -@ESP@/limine-splash.png
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes

@@ -1,0 +1,14 @@
+[Unit]
+Description=Accept local wallpaper updates for Limine
+
+[Socket]
+ListenStream=/run/ii-limine-wallpaper.sock
+SocketUser=@USER@
+SocketGroup=@GROUP@
+SocketMode=0600
+Accept=yes
+MaxConnections=1
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

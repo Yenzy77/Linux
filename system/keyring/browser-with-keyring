@@ -1,0 +1,38 @@
+#!/usr/bin/bash
+set -u
+
+if [[ ${1-} == --check-only ]]; then
+    mode=check
+    shift
+else
+    mode=launch
+fi
+
+for browser in google-chrome-stable brave zen-browser firefox chromium microsoft-edge-stable opera librewolf; do
+    command -v "$browser" >/dev/null 2>&1 || continue
+    if [[ $browser == brave ]]; then
+        alias_result=$(busctl --user --auto-start=no --timeout=2s call org.freedesktop.secrets \
+            /org/freedesktop/secrets org.freedesktop.Secret.Service ReadAlias s login 2>/dev/null)
+        if [[ $alias_result =~ ^o\ \"(/org/freedesktop/secrets/collection/[a-zA-Z0-9_]+)\"$ ]] &&
+            [[ $(busctl --user --auto-start=no --timeout=2s get-property org.freedesktop.secrets \
+                "${BASH_REMATCH[1]}" org.freedesktop.Secret.Collection Locked 2>/dev/null) == 'b false' ]]; then
+            if [[ $mode == check ]]; then
+                printf '%s\n' 'Brave guard would allow launch: Login keyring is unlocked.'
+                exit 0
+            fi
+        else
+            if [[ $mode == check ]]; then
+                printf '%s\n' 'Brave guard would block launch: Login keyring is unavailable or locked.' >&2
+            else
+                notify-send --app-name='Brave launch guard' --urgency=critical \
+                    'Brave was blocked' 'The Login keyring is locked or unavailable. Unlock it before opening Brave.'
+            fi
+            exit 1
+        fi
+    elif [[ $mode == check ]]; then
+        printf '%s\n' "Super+W would select $browser."
+        exit 0
+    fi
+    exec "$browser" "$@"
+done
+exit 1

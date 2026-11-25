@@ -1,0 +1,16 @@
+-- Optional reference for a host-local Hyprland custom/general.lua.
+-- Review output mode, color management and direct scanout for the local GPU.
+hl.monitor({
+    output = "",
+    mode = "highrr",
+    position = "auto",
+    scale = 1,
+    cm = "srgb"
+})
+
+hl.config({
+    render = {
+        direct_scanout = 0,
+        cm_auto_hdr = 0
+    }
+})

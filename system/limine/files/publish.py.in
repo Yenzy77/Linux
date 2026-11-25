@@ -1,0 +1,202 @@
+"""Publish a validated Limine wallpaper and its six allowlisted menu colors."""
+import fcntl
+import hashlib
+import os
+import socket
+import stat
+import struct
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import palette
+
+
+ESP = Path("@ESP@")
+TARGET = ESP / "ii-limine-theme/wallpaper.qoi"
+CONFIG = ESP / "limine.conf"
+MAX_CONFIG = 1024 * 1024
+LOCK = "/run/lock/boot-partition.lock"
+SECURE_BOOT = Path("/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c")
+WIDTH, HEIGHT = 1920, 1080
+MAX_BYTES = WIDTH * HEIGHT * 4 + 22
+PUBLISHER_UID = @UID@
+
+
+def validate_qoi(blob):
+    pixels = WIDTH * HEIGHT
+    if not 23 <= len(blob) <= MAX_BYTES:
+        raise ValueError("QOI size outside the permitted range")
+    if blob[:13] != b"qoif" + struct.pack(">IIB", WIDTH, HEIGHT, 3) or blob[13] not in (0, 1):
+        raise ValueError("expected a 1920x1080 RGB QOI")
+    if blob[-8:] != b"\0" * 7 + b"\1":
+        raise ValueError("incorrect QOI end marker")
+
+    end, cursor, emitted = len(blob) - 8, 14, 0
+    while cursor < end and emitted < pixels:
+        opcode = blob[cursor]
+        cursor += 1
+        emitted += 1
+        if opcode == 0xFE:
+            cursor += 3
+        elif opcode == 0xFF:
+            raise ValueError("RGBA chunks are outside the permitted RGB profile")
+        elif opcode >= 0xC0:
+            emitted += opcode & 0x3F
+        elif 0x80 <= opcode < 0xC0:
+            cursor += 1
+    if cursor != end or emitted != pixels:
+        raise ValueError("QOI pixel count or opcode boundary is invalid")
+
+
+def read_regular(path, limit):
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return None
+    with os.fdopen(fd, "rb") as stream:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError("unexpected boot asset ownership or file type")
+        data = stream.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError("boot asset exceeds the permitted size")
+        return data
+
+
+def stage_file(path, data):
+    fd, temporary = tempfile.mkstemp(prefix=".ii-limine-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+    return Path(temporary)
+
+
+def replace_theme(files):
+    # Stage both replacements and any rollback copies before touching live files.
+    stages, applied = [], []
+    try:
+        for path, previous, updated in files:
+            new_file = stage_file(path, updated)
+            stages.append(new_file)
+            old_file = stage_file(path, previous) if previous is not None else None
+            if old_file is not None:
+                stages.append(old_file)
+            applied.append((path, new_file, old_file))
+        committed = []
+        try:
+            for path, new_file, old_file in applied:
+                os.replace(new_file, path)
+                committed.append((path, old_file))
+            for directory in {path.parent for path, _, _ in applied}:
+                fd = os.open(directory, os.O_DIRECTORY | os.O_NOFOLLOW)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        except OSError as error:
+            for path, old_file in reversed(committed):
+                if old_file is not None:
+                    os.replace(old_file, path)
+                else:
+                    path.unlink()
+            raise error
+    finally:
+        for stage in stages:
+            stage.unlink(missing_ok=True)
+
+
+def enrolled():
+    # The installed management tools take this setting only from /etc/default.
+    settings = Path("/etc/default/limine").read_text()
+    for line in settings.splitlines():
+        key, _, value = line.partition("=")
+        if key.strip() == "ENABLE_ENROLL_LIMINE_CONFIG" and value.split("#", 1)[0].strip().strip("\"'") not in ("", "no"):
+            return True
+    image = read_regular(ESP / "EFI/limine/limine_x64.efi", MAX_CONFIG)
+    return image is None or image != Path("/usr/share/limine/BOOTX64.EFI").read_bytes()
+
+
+def handle(payload):
+    config = read_regular(CONFIG, MAX_CONFIG)
+    if config is None:
+        raise ValueError("Limine menu does not exist")
+    header, _, old_colors = palette.header_colors(config)
+    if b"\nwallpaper: boot():/ii-limine-theme/wallpaper.qoi\n" not in header:
+        raise ValueError("Limine no longer references the managed wallpaper")
+    wallpaper = read_regular(TARGET, MAX_BYTES)
+    wallpaper_hash = "-" if wallpaper is None else hashlib.sha256(wallpaper).hexdigest()
+    if payload == b"state2\n":
+        return f"state {wallpaper_hash} {palette.digest(old_colors)}\n"
+    command, delim, image = payload.partition(b"\n")
+    fields = command.decode("ascii").split(" ")
+    if not delim or len(command) > 150 or len(fields) != 8 or fields[0] != "theme1":
+        raise ValueError("invalid theme request")
+    expected, colors = fields[1], tuple(fields[2:])
+    updated = palette.patch_config(config, colors)
+    if image:
+        validate_qoi(image)
+        actual = hashlib.sha256(image).hexdigest()
+    else:
+        actual = wallpaper_hash
+    if expected != actual or actual == "-":
+        raise ValueError("wallpaper digest did not match the paired palette")
+    files = []
+    if image and image != wallpaper:
+        files.append((TARGET, wallpaper, image))
+    if updated != config:
+        files.append((CONFIG, config, updated))
+    if files:
+        if enrolled():
+            raise ValueError("Limine enrollment is enabled; visual writes refused")
+        replace_theme(files)
+    action = "Installed" if files else "Verified unchanged"
+    color_hash = palette.digest(colors)
+    print(f"{action} Limine theme (wallpaper {actual}, palette {color_hash}).")
+    return f"ok {actual} {color_hash}\n"
+
+
+def main():
+    if not ESP.is_mount() or SECURE_BOOT.read_bytes()[4:] != b"\0":
+        raise ValueError("ESP mount or unenrolled-mode Secure Boot precondition failed")
+    directory = TARGET.parent.lstat()
+    if not stat.S_ISDIR(directory.st_mode) or directory.st_uid != 0 or directory.st_mode & 0o022:
+        raise ValueError("ESP target directory must be root-owned and protected")
+    with socket.socket(fileno=0) as conn:
+        _, uid, _ = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+        if uid != PUBLISHER_UID:
+            raise PermissionError("unexpected wallpaper publisher uid")
+        conn.settimeout(8)
+        with conn.makefile("rb") as stream:
+            blob = stream.read(MAX_BYTES + 257)
+        fd = os.open(LOCK, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+                raise ValueError("unexpected Limine lock file ownership or permissions")
+            for attempt in range(80):
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if attempt == 79:
+                        raise
+                    time.sleep(0.25)
+            reply = handle(blob)
+        finally:
+            os.close(fd)
+        conn.sendall(reply.encode())
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError) as error:
+        sys.exit(f"Limine wallpaper was retained or the request could not be acknowledged: {error}")

@@ -1,0 +1,28 @@
+[Unit]
+Description=Publish SDDM wallpaper and palette data
+
+[Service]
+User=sddm
+Group=sddm
+Type=exec
+Environment=II_SDDM_PUBLISHER_UID=@PUBLISHER_UID@
+ExecStart=/usr/bin/python -I /usr/local/lib/ii-sddm-sync/sync.py receive
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+StateDirectory=ii-sddm-sync
+StateDirectoryMode=0750
+UMask=0027
+RuntimeMaxSec=50
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes

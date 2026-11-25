@@ -1,0 +1,16 @@
+[Unit]
+Description=Render the ii wallpaper for Limine
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python -I /usr/local/lib/ii-limine-wallpaper/render.py
+CacheDirectory=ii-limine-wallpaper
+CacheDirectoryMode=0700
+TimeoutStartSec=3min
+Restart=on-abnormal
+RestartSec=2s
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=default.target

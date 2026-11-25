@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch the illogical-impulse wallpaper and Matugen palette for Limine
+
+[Path]
+PathChanged=%h/.config/illogical-impulse/config.json
+PathChanged=%h/.local/state/quickshell/user/generated/colors.json
+PathChanged=%h/.local/state/quickshell/user/generated/wallpaper/path.txt
+
+[Install]
+WantedBy=default.target

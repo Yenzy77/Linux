@@ -1,0 +1,216 @@
+--- a/hypr/custom/execs.lua
++++ b/hypr/custom/execs.lua
+@@ -1 +1 @@
+-
++-- Startup locking is handled by the password-authenticated SDDM login.
+--- a/hypr/custom/variables.lua
++++ b/hypr/custom/variables.lua
+@@ -1 +1,3 @@
+ 
++codeEditor = "gtk-launch antigravity-ide"
++browser = "/usr/local/lib/ii-sddm-sync/browser-with-keyring"
+--- a/hypr/hypridle.conf
++++ b/hypr/hypridle.conf
+@@ -1,4 +1,4 @@
+-$lock_cmd = hyprctl dispatch 'hl.dsp.global("quickshell:lock")' & pidof qs quickshell hyprlock || hyprlock
++$lock_cmd = hyprctl dispatch 'hl.dsp.global("quickshell:lock")'
+ # $lock_cmd = pidof hyprlock || hyprlock
+ $suspend_cmd = systemctl suspend || loginctl suspend
+ 
+--- a/hypr/hyprland/execs.lua
++++ b/hypr/hyprland/execs.lua
+@@ -7,7 +7,11 @@
+     hl.exec_cmd("$HOME/.config/hypr/custom/scripts/__restore_video_wallpaper.sh")
+ 
+     -- Core components (authentication, lock screen, notification daemon)
+-    hl.exec_cmd("gnome-keyring-daemon --start --components=secrets")
++    -- Only complete the PAM-started daemon's D-Bus handoff when needed.
++    hl.exec_cmd([[if [ -n "$GNOME_KEYRING_CONTROL" ] &&
++        [ "$(busctl --user --timeout=2s call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus NameHasOwner s org.freedesktop.secrets 2>/dev/null)" = "b false" ]; then
++        /usr/bin/gnome-keyring-daemon --start --components=secrets
++    fi]])
+     hl.exec_cmd("hypridle")
+     hl.exec_cmd("dbus-update-activation-environment --all")
+     hl.exec_cmd("sleep 1 && dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP") -- Some fix idk
+--- a/hypr/hyprland/general.lua
++++ b/hypr/hyprland/general.lua
+@@ -95,7 +95,7 @@
+             enabled = true,
+             range = 20,
+             offset = {0, 2},
+-            render_power = 10,
++            render_power = 4,
+             color = "rgba(00000020)"
+ 
+         },
+--- a/hypr/hyprland/keybinds.lua
++++ b/hypr/hyprland/keybinds.lua
+@@ -9,10 +9,10 @@
+ local qsIpcCall = "qs -c $qsConfig ipc call"
+ local qsIsAlive = qsIpcCall .. " TEST_ALIVE"
+ 
+-hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:searchToggleRelease"), { description = "Shell: Toggle search" })
+-hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease"))
+-hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"))
+-hl.bind("SUPER + SUPER_R", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"))
++hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:searchToggleRelease"), { release = true, description = "Shell: Toggle search" })
++hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease"), { release = true })
++hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"), { release = true })
++hl.bind("SUPER + SUPER_R", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"), { release = true })
+ 
+ hl.bind("SUPER_L", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = true, transparent = true })
+ hl.bind("SUPER_R", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = true, transparent = true })
+--- a/hypr/hyprland/variables.lua
++++ b/hypr/hyprland/variables.lua
+@@ -8,12 +8,12 @@
+ -- PULL REQUESTS ADDING MORE WILL NOT BE ACCEPTED, CONFIG FOR YOURSELF
+ terminal = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'foot' 'kitty -1' 'alacritty' 'wezterm' 'konsole' 'kgx' 'uxterm' 'xterm'"
+ fileManager = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'dolphin' 'nautilus' 'nemo' 'thunar' 'kitty -1 fish -c yazi'"
+-browser = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'google-chrome-stable' 'zen-browser' 'firefox' 'brave' 'chromium' 'microsoft-edge-stable' 'opera' 'librewolf'"
++browser = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'google-chrome-stable' 'brave' 'zen-browser' 'firefox' 'chromium' 'microsoft-edge-stable' 'opera' 'librewolf'"
+ codeEditor = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'windsurf' 'antigravity' 'code' 'codium' 'cursor' 'zed' 'zedit' 'zeditor' 'kate' 'gnome-text-editor' 'emacs' 'command -v nvim && kitty -1 nvim' 'command -v micro && kitty -1 micro'"
+ officeSoftware = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'wps' 'onlyoffice-desktopeditors' 'libreoffice'"
+ textEditor = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'kate' 'gnome-text-editor' 'emacs'"
+ volumeMixer = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'pavucontrol-qt' 'pavucontrol'"
+ settingsApp = "XDG_CURRENT_DESKTOP=gnome ~/.config/hypr/hyprland/scripts/launch_first_available.sh 'qs -p ~/.config/quickshell/$qsConfig/settings.qml' 'systemsettings' 'gnome-control-center' 'better-control'"
+-taskManager = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'gnome-system-monitor' 'plasma-systemmonitor --page-name Processes' 'command -v btop && kitty -1 fish -c btop'"
++taskManager = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'missioncenter' 'gnome-system-monitor' 'plasma-systemmonitor --page-name Processes' 'command -v btop && kitty -1 fish -c btop'"
+ 
+ workspaceGroupSize = 10
+--- a/hypr/hyprlock.conf
++++ b/hypr/hyprlock.conf
+@@ -32,7 +32,7 @@
+ 
+ label { # Caps Lock Warning
+     monitor =
+-    text = cmd[update:250] ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock/check-capslock.sh
++    text =
+     color = $text_color
+     font_size = 13
+     font_family = $font_family
+@@ -69,10 +69,6 @@
+     monitor =
+     text =     $USER
+     color = $text_color
+-    outline_thickness = 2
+-    dots_size = 0.2 # Scale of input-field height, 0.2 - 0.8
+-    dots_spacing = 0.2 # Scale of dots' absolute size, 0.0 - 1.0
+-    dots_center = true
+     font_size = 20
+     font_family = $font_family
+     position = 0, 50
+@@ -82,7 +78,7 @@
+ 
+ label { # Status
+     monitor =
+-    text = cmd[update:5000] ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock/status.sh
++    text = Sesi Terkunci
+     color = $text_color
+     font_size = 14
+     font_family = $font_family
+@@ -90,4 +86,4 @@
+     position = 30, -30
+     halign = left
+     valign = top
+-}
+\ No newline at end of file
++}
+--- a/kitty/kitty.conf
++++ b/kitty/kitty.conf
+@@ -37,3 +37,5 @@
+ map ctrl+kp_subtract       change_font_size all -1
+ map ctrl+0 change_font_size all 0
+ map ctrl+kp_0 change_font_size all 0
++
++remember_window_size no
+--- a/quickshell/ii/modules/common/models/quickToggles/CloudflareWarpToggle.qml
++++ b/quickshell/ii/modules/common/models/quickToggles/CloudflareWarpToggle.qml
+@@ -65,7 +65,7 @@
+                     root.available = true
+                 }
+                 if (warpStatusCollector.text.includes("Unable")) {
+-                    registrationProc.running = true
++                    root.toggled = false
+                 } else if (warpStatusCollector.text.includes("Connected")) {
+                     root.toggled = true
+                 } else if (warpStatusCollector.text.includes("Disconnected")) {
+--- a/quickshell/ii/modules/ii/bar/Resources.qml
++++ b/quickshell/ii/modules/ii/bar/Resources.qml
+@@ -45,6 +45,12 @@
+             warningThreshold: Config.options.bar.resources.cpuWarningThreshold
+         }
+ 
++        Resource {
++            iconName: "developer_board"
++            percentage: ResourceUsage.gpuUsage
++            shown: ResourceUsage.gpuAvailable
++            Layout.leftMargin: shown ? 6 : 0
++        }
+     }
+ 
+     ResourcesPopup {
+--- a/quickshell/ii/modules/ii/bar/ResourcesPopup.qml
++++ b/quickshell/ii/modules/ii/bar/ResourcesPopup.qml
+@@ -90,5 +90,20 @@
+                 }
+             }
+         }
++        Column {
++            visible: ResourceUsage.gpuAvailable
++            anchors.top: parent.top
++            spacing: 8
++
++            StyledPopupHeaderRow {
++                icon: "developer_board"
++                label: "GPU"
++            }
++            StyledPopupValueRow {
++                icon: "bolt"
++                label: Translation.tr("Load:")
++                value: `${Math.round(ResourceUsage.gpuUsage * 100)}%`
++            }
++        }
+     }
+ }
+--- a/quickshell/ii/modules/ii/sidebarRight/quickToggles/classicStyle/CloudflareWarp.qml
++++ b/quickshell/ii/modules/ii/sidebarRight/quickToggles/classicStyle/CloudflareWarp.qml
+@@ -77,7 +77,7 @@
+                     root.visible = true
+                 }
+                 if (warpStatusCollector.text.includes("Unable")) {
+-                    registrationProc.running = true
++                    root.toggled = false
+                 } else if (warpStatusCollector.text.includes("Connected")) {
+                     root.toggled = true
+                 } else if (warpStatusCollector.text.includes("Disconnected")) {
+--- a/quickshell/ii/services/ResourceUsage.qml
++++ b/quickshell/ii/services/ResourceUsage.qml
+@@ -19,6 +19,8 @@
+ 	property real swapFree: 0
+ 	property real swapUsed: swapTotal - swapFree
+     property real swapUsedPercentage: swapTotal > 0 ? (swapUsed / swapTotal) : 0
++    property real gpuUsage: 0
++    property bool gpuAvailable: false
+     property real cpuUsage: 0
+     property var previousCpuStats
+ 
+@@ -67,6 +69,11 @@
+             // Reload files
+             fileMeminfo.reload()
+             fileStat.reload()
++            fileGpu.reload()
++
++            const gpuText = fileGpu.text().trim()
++            gpuAvailable = /^\d+$/.test(gpuText)
++            if (gpuAvailable) gpuUsage = Math.max(0, Math.min(100, Number(gpuText))) / 100
+ 
+             // Parse memory and swap usage
+             const textMeminfo = fileMeminfo.text()
+@@ -99,6 +106,7 @@
+ 
+ 	FileView { id: fileMeminfo; path: "/proc/meminfo" }
+     FileView { id: fileStat; path: "/proc/stat" }
++    FileView { id: fileGpu; path: Quickshell.env("II_GPU_BUSY_PATH") || "/dev/null" }
+ 
+     Process {
+         id: findCpuMaxFreqProc

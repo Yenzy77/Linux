@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch illogical-impulse settings and Matugen colors for SDDM
+
+[Path]
+PathChanged=%h/.config/illogical-impulse/config.json
+PathChanged=%h/.local/state/quickshell/user/generated/colors.json
+
+[Install]
+WantedBy=default.target

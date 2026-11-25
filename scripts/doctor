@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -u
+failures=0
+check() {
+    local label=$1
+    shift
+    if "$@" >/dev/null 2>&1; then
+        printf 'OK   %s\n' "$label"
+    else
+        printf 'FAIL %s\n' "$label"
+        failures=$((failures + 1))
+    fi
+}
+check 'CachyOS' grep -qx ID=cachyos /etc/os-release
+check 'Hyprland installed' command -v Hyprland
+check 'Matugen installed' command -v matugen
+check 'SDDM active' systemctl is-active sddm.service
+check 'SDDM theme watcher active' systemctl --user is-active ii-sddm-publish.path
+check 'Limine renderer watcher active' systemctl --user is-active ii-limine-render.path
+check 'Limine publisher socket active' systemctl is-active ii-limine-wallpaper.socket
+check 'Shared boot lock exists' test -f /run/lock/boot-partition.lock
+check 'Brave readiness check' /usr/local/lib/ii-sddm-sync/browser-with-keyring --check-only
+exit "$((failures != 0))"
