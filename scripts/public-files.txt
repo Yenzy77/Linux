@@ -7,6 +7,7 @@ docs/BACKUP_AND_RESTORE.md
 docs/BASELINE.md
 docs/CHANGELOG.md
 docs/INSTALLATION.md
+docs/MAINTENANCE.md
 docs/PROJECT_PLAN.md
 docs/ROADMAP.md
 docs/SECURITY.md
@@ -28,6 +29,10 @@ scripts/public-files.txt
 scripts/publication-check
 scripts/restore
 shared/README.md
+shared/applications/steam-material/LICENSE
+shared/applications/steam-material/README.md
+shared/applications/steam-material/matugen.toml.example
+shared/applications/steam-material/millennium.css
 system/keyring/README.md
 system/keyring/browser-with-keyring
 system/keyring/test-guard.sh

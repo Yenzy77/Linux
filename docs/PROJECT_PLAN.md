@@ -219,3 +219,17 @@ During baseline capture do not reboot, logout, restart SDDM, terminate Hyprland,
 ## 11. Coordination and current status
 
 At the time this plan is published, the local baseline capture is being handled separately by Codex Desktop and was interrupted by a usage limit. The remote repository had no initial commit when checked. This document is planning-only; the local implementation must retain its work, fetch the remote documentation commit, reconcile history safely before pushing, and link this plan in README. Do not force-push over the planning commit or duplicate the plan unnecessarily. Actual baseline completion, local file inventory, licensing evidence, fresh-install reproducibility and physical verification must be reported separately.
+
+## 12. Phase 1.1 maintenance and planning addendum
+
+Phase 1.1 refreshes package observations while preserving the historical inventory. It may capture optional application adapters that already exist on the reference workstation. Validate reported maintenance against installed packages and configuration, record unresolved runtime checks, and keep this work separate from Phase 2.
+
+Add [Ryoku](https://github.com/Ryoku-dev/ryoku) and [Omarchy](https://github.com/basecamp/omarchy) to the candidate evaluation list. Treat upstream repositories and ISO images as sources for selective adaptation. Verify provenance and licenses, inspect artifacts in isolated staging, and avoid executing upstream installers or reusing machine identities. Any optional ISO Builder should consume validated manifests and produce disposable test images only after distribution adapters and recovery tests are established.
+
+System-wide dynamic theming is a planned opt-in adapter model. Each application integration will declare its inputs, outputs, compatibility and rollback. Plymouth customization and dynamic theming are optional and require separate review of boot verbosity, asset permissions and initramfs changes.
+
+The optional GUI Desktop Profile Manager is planned to cover installation, updates, activation, backup, restore, compatibility checks, upstream source management, Git integration and diagnostics. It should use the CLI's validation and authorization boundaries.
+
+For custom desktop packages, plan pre-update checks for versions, sources, dependency changes and recovery options. Follow updates with package consistency, ABI and runtime checks. Document rebuild and recovery procedures without relying on unreviewed library substitutions.
+
+See the [maintenance audit](MAINTENANCE.md) for observed evidence and pending tests. Later features remain outside Phase 1.1.

@@ -1,0 +1,27 @@
+# Phase 1.1 system maintenance audit
+
+This November 26, 2026 audit used package metadata, filtered transaction counts, local configuration facts and read-only dependency checks. It did not rerun the earlier administrator work. The [package manifest](../packages/arch/reference.tsv) preserves the original capture and publication versions and adds the Phase 1.1 observation.
+
+| Area | Confirmed evidence | Remaining validation |
+| --- | --- | --- |
+| CachyOS update | Pacman recorded a completed transaction with 533 package actions, of which 527 were upgrades. The local dependency database passed `pacman -Dk`. | Database consistency does not establish runtime compatibility. Keep an LTS or verified recovery boot option available. |
+| illogical-impulse Quickshell | Pacman recorded a reinstall of `illogical-impulse-quickshell-git` at the same package version. The current packaged executable resolved all ELF dependencies in the audit and a Quickshell process was running. | A reinstall record alone cannot prove source revision, compiler inputs, or a clean rebuild. Reproduce the build only in a separate approved maintenance window and test plugin and widget loading after the next planned session start. |
+| libcava | An upgrade is recorded. The installed library exposes `libcava.so.1` and its dependencies resolve. The inspected Quickshell executable did not list libcava directly. | The original failing consumer, its exact missing SONAME or symbol, and end-to-end visualizer recovery remain unverified. Check the affected consumer's direct dependencies and plugin loading. |
+| DroidCam | The installed client and OBS plugin are present. The running kernel provides generic `v4l2loopback`. The package's module-load file requests `v4l2loopback-dc`, which did not resolve on the running kernel. | Recheck the intended virtual-camera provider on the next running kernel. A module file being available does not prove a camera works. Test a device and OBS input after resolving the provider discrepancy. |
+| Rust and Cargo | Pacman recorded a Rust install. Both tools report version 1.100.0 and are supplied by the same package. | No build or toolchain change was attempted. |
+| Steam, Millennium and Material | Millennium 3.7.0 Beta 2 package is installed. SteamRT files, the x86-64 bootstrap and Material 1.5.21 metadata were inspected. Local Matugen inputs and the CSS output path match the [opt-in adapter](../shared/applications/steam-material/README.md). | Test actual SteamRT3 injection and client/theme behavior after a planned Steam restart. Test Matugen on a wallpaper change. The generated CSS was observed at mode `0666`. Keep the intended theme output owner-writable only during a separately approved maintenance window. |
+| NAPS2 | The 8.3.2 package and executable are present. SANE is installed and the executable's ELF dependencies resolved in the audit. | The prior investigation's outcome, device discovery and scan success are unresolved. Test the specific scanner/backend and UI in a later hardware-enabled session. |
+
+## Before maintenance
+
+Inspect official package and distribution notices. Record the running and installed kernel, relevant package versions, custom or foreign package sources and presently active integrations. Review planned removals and ABI changes. Confirm enough disk space for packages, a usable recovery option, and independent backups of root, home and ESP state where applicable. Export future build recipes only after reviewing source licenses and removing host details. Keep package caches and raw build/transaction logs outside Git.
+
+Use a coordinated distribution update during approved maintenance. Partial upgrades, cross-version SONAME symlinks and unreviewed library substitution can mask errors and break consumers. When a loader error appears, identify the executable and its packaged dependencies with `pacman -Qo`, `readelf -d` and, for trusted installed binaries only, `ldd`. A matching SONAME does not guarantee compatible symbol versions. Check actual plugin consumers and the journal before deciding whether to rebuild.
+
+## After maintenance and recovery
+
+Run `scripts/doctor --maintenance`. It checks the package dependency database, packaged Quickshell dependencies and selected optional maintenance prerequisites. Warnings identify missing optional prerequisites and do not certify runtime behavior. For a custom rebuild, record a reviewed source revision, package recipe, dependency and build toolchain versions, and a clean build log locally. Validate the resulting package and related consumers in a disposable environment first.
+
+On the next planned reboot or session change, confirm the intended kernel and module availability, SDDM login and Keyring readiness, then desktop and appearance synchronization. Confirm the affected audio, camera, Steam and scanner workflows separately. Record failures by component. Use a verified recovery boot or restore a coherent set of packages/configuration through the distributions' documented procedures. Never restore raw ESP or system backups across different machines. See [backup and restore](BACKUP_AND_RESTORE.md).
+
+During the Phase 1.1 audit, the SDDM and Limine watchers and sockets were active, their existing systemd units passed verification, and the Login collection was unlocked. The Brave guard passed in check-only mode. The Steam adapter rendered a synthetic palette to an isolated directory. No desktop process, account data, boot settings or live theme files were changed.

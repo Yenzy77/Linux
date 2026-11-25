@@ -1,0 +1,5 @@
+# Merge this one table into the existing Matugen configuration.
+# Replace these examples with the actual absolute paths on the target.
+[templates.millennium]
+input_path = '/path/to/config/matugen/millennium.css'
+output_path = '/path/to/Material-Theme/css/main/colors/matugen.css'

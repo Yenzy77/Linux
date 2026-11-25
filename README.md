@@ -10,6 +10,7 @@ Start with the [baseline inventory](docs/BASELINE.md) and [installation limits](
 - [Upstream dependencies and attribution](docs/UPSTREAM.md)
 - [Changelog](docs/CHANGELOG.md)
 - [Reference package manifest](packages/arch/reference.tsv)
+- [Maintenance audit](docs/MAINTENANCE.md) and [optional Steam Material adapter](shared/applications/steam-material/README.md)
 - [Hyprland and ii profile](profiles/hyprland/illogical-impulse/README.md)
 - [SDDM](system/sddm/README.md), [Keyring and Brave guard](system/keyring/README.md), and [Limine](system/limine/README.md)
 

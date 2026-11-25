@@ -23,3 +23,5 @@ Earlier live validation included password login, Keyring unlock, guard check, an
 - Six isolated Brave guard cases, three SDDM publisher tests and three Limine palette tests passed. The system and user service templates were materialized and checked with systemd.
 - Live read-only checks found SDDM, both appearance watchers and both publisher sockets active. The Login collection returned `b false`. The guard passed in check-only mode. No live installer was run and no browser profile was accessed.
 - Full graphical deployment and reboot on a new CachyOS system, alternate hardware and ESP layouts, and other distributions remain unverified.
+
+Phase 1.1 adds separate [maintenance observations](MAINTENANCE.md) and an [optional Steam Material adapter](../shared/applications/steam-material/README.md). The original baseline observations above remain historical.

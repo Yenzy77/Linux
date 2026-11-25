@@ -16,3 +16,7 @@ The [agreed project plan](PROJECT_PLAN.md) is the source for candidate profiles,
 | 10. Optional graphical manager | Provide inspectable dry runs, clear authorization boundaries and equivalent CLI recovery. |
 
 The reference host has `plasma-workspace` and KWin installed. `plasma-desktop` is missing. Prior observation showed `plasma-plasmashell.service` repeatedly exiting with status 1. The exact cause remains open for Phase 3. Phase 1 makes no Plasma changes.
+
+**Phase 1.1 maintenance refresh.** Preserve historical inventories, capture optional Steam theming, and record read-only findings before Phase 2. Require pre-update source/dependency and backup checks for custom desktop packages, followed by post-update dependency, ABI and runtime verification. See the [maintenance audit](MAINTENANCE.md).
+
+**Planned scope within existing phases.** Evaluate Ryoku and Omarchy during additional profile intake. Review upstream project files or extract ISO files in an isolated workspace before adapting any configuration. Expand appearance work to opt-in application adapters and separately gated Plymouth customization. An ISO Builder is optional after distribution adapters and clean-install validation. The optional GUI would cover install, update, activation, backup, restore, compatibility checks, upstream pins, Git and diagnostics.
